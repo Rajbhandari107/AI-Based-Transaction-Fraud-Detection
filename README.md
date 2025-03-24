@@ -54,6 +54,9 @@ python app.py
 
 Open in Browser:Visit http://127.0.0.1:5000/ to use the fraud detection system.
 
+Credit - https://www.kaggle.com/datasets/shriyashjagtap/fraudulent-e-commerce-transactions 
+I used this dataset
+
 Future Improvements
 
 Enhance model accuracy with advanced techniques.
