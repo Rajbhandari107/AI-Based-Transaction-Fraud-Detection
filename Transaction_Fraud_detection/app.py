@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Buddham Rajbhandari (RA2311026011107)
+# Email: buddhamrajbhandari30@gmail.com
+# This project is licensed under the MIT License – see the LICENSE file for details.
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
