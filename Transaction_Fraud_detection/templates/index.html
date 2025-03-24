@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Detection System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><b>Transaction Fraud Detection</b></h1>
+            <p>Analyze transactions for potential fraud risks</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="form-container">
+                <form id="transactionForm">
+                    <div class="form-section">
+                        <h2>Transaction Details</h2>
+                        <div class="form-group">
+                            <label for="transactionAmount">Transaction Amount ($)</label>
+                            <input type="number" id="transactionAmount" name="Transaction Amount" step="0.01" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="transactionDate">Transaction Date</label>
+                            <input type="date" id="transactionDate" name="transaction_date">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="paymentMethod">Payment Method</label>
+                            <select id="paymentMethod" name="Payment Method" required>
+                                <option value="" disabled selected>Select payment method</option>
+                                {% for method in payment_methods %}
+                                <option value="{{ method }}">{{ method }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h2>Customer Information</h2>
+                        <div class="form-group">
+                            <label for="customerLocation">Customer Location</label>
+                            <select id="customerLocation" name="Customer Location" required>
+                                <option value="" disabled selected>Select location</option>
+                                {% for location in locations %}
+                                <option value="{{ location }}">{{ location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="deviceUsed">Device Used</label>
+                            <select id="deviceUsed" name="Device Used" required>
+                                <option value="" disabled selected>Select device</option>
+                                {% for device in devices %}
+                                <option value="{{ device }}">{{ device }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="previousTransactions">Previous Transactions Count</label>
+                            <input type="number" id="previousTransactions" name="Previous Transactions Count" min="0" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="accountAge">Account Age (Days)</label>
+                            <input type="number" id="accountAge" name="Account Age Days" min="0" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Shipping Address</label>
+                            <div class="radio-group">
+                                <input type="radio" id="sameAddress" name="Shipping Address" value="Same as billing address" checked>
+                                <label for="sameAddress">Same as billing address</label>
+                                
+                                <input type="radio" id="differentAddress" name="Shipping Address" value="Different from billing address">
+                                <label for="differentAddress">Different from billing address</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" id="analyzeBtn">Analyze Transaction</button>
+                        <div class="sample-data-buttons">
+                            <button type="button" id="loadLegitimate">Load Sample Legitimate</button>
+                            <button type="button" id="loadFraudulent">Load Sample Fraudulent</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="results-container" id="resultsContainer">
+                <h2>Analysis Results</h2>
+                <div id="loadingIndicator" class="loading-indicator hidden">
+                    <div class="spinner"></div>
+                    <p>Analyzing transaction...</p>
+                </div>
+                
+                <div id="resultContent" class="hidden">
+                    <div class="result-header">
+                        <div class="fraud-indicator" id="fraudIndicator">
+                            <!-- Status icon will be inserted here -->
+                        </div>
+                        <div class="result-title" id="resultTitle">
+                            <!-- Title will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    <div class="result-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Risk Level:</span>
+                            <span class="detail-value" id="riskLevel"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Confidence:</span>
+                            <span class="detail-value" id="confidence"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Transaction Amount:</span>
+                            <span class="detail-value" id="resultAmount"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Payment Method:</span>
+                            <span class="detail-value" id="resultPayment"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Visualizations Section -->
+                    <div class="visualizations">
+                        <div class="chart-container">
+                            <h3>Risk Assessment</h3>
+                            <div class="gauge-container">
+                                <canvas id="gaugeChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <h3>Risk Factors</h3>
+                            <div class="risk-factors-container">
+                                <canvas id="riskFactorsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-footer" id="resultRecommendation">
+                        <!-- Recommendation will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>©2025 Transaction Fraud Detection System | AI-Powered Risk Assessment | Team 007 | CENTINEL</p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const transactionForm = document.getElementById('transactionForm');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const resultContent = document.getElementById('resultContent');
+            const loadLegitimateBtn = document.getElementById('loadLegitimate');
+            const loadFraudulentBtn = document.getElementById('loadFraudulent');
+            
+            let gaugeChart = null;
+            let riskFactorsChart = null;
+            
+            // Form submission handler
+            transactionForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Show loading indicator
+                loadingIndicator.classList.remove('hidden');
+                resultContent.classList.add('hidden');
+                
+                // Get form data
+                const formData = new FormData(transactionForm);
+                
+                // Submit form data via fetch
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loading indicator
+                    loadingIndicator.classList.add('hidden');
+                    
+                    // Display results
+                    displayResults(data, formData);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loadingIndicator.classList.add('hidden');
+                    alert('An error occurred during analysis. Please try again.');
+                });
+            });
+            
+            // Load sample data
+            loadLegitimateBtn.addEventListener('click', function() {
+                loadSampleData('legitimate');
+            });
+            
+            loadFraudulentBtn.addEventListener('click', function() {
+                loadSampleData('fraudulent');
+            });
+            
+            function loadSampleData(type) {
+                fetch(`/sample_data?type=${type}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Fill the form with sample data
+                    document.getElementById('transactionAmount').value = data['Transaction Amount'];
+                    document.getElementById('transactionDate').value = data['transaction_date'];
+                    document.getElementById('paymentMethod').value = data['Payment Method'];
+                    document.getElementById('customerLocation').value = data['Customer Location'];
+                    document.getElementById('deviceUsed').value = data['Device Used'];
+                    document.getElementById('previousTransactions').value = data['Previous Transactions Count'];
+                    document.getElementById('accountAge').value = data['Account Age Days'];
+                    
+                    if (data['Shipping Address'] === 'Same as billing address') {
+                        document.getElementById('sameAddress').checked = true;
+                    } else {
+                        document.getElementById('differentAddress').checked = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sample data:', error);
+                });
+            }
+            
+            function displayResults(data, formData) {
+                // Get references to result elements
+                const fraudIndicator = document.getElementById('fraudIndicator');
+                const resultTitle = document.getElementById('resultTitle');
+                const riskLevel = document.getElementById('riskLevel');
+                const confidence = document.getElementById('confidence');
+                const resultAmount = document.getElementById('resultAmount');
+                const resultPayment = document.getElementById('resultPayment');
+                const resultRecommendation = document.getElementById('resultRecommendation');
+                
+                // Format and display results
+                if (data.is_fraud) {
+                    fraudIndicator.innerHTML = '<div class="status-icon status-fraud"></div>';
+                    resultTitle.innerHTML = '<h3>Potential Fraud Detected</h3>';
+                    fraudIndicator.className = 'fraud-indicator fraud';
+                } else {
+                    fraudIndicator.innerHTML = '<div class="status-icon status-legitimate"></div>';
+                    resultTitle.innerHTML = '<h3>Legitimate Transaction</h3>';
+                    fraudIndicator.className = 'fraud-indicator legitimate';
+                }
+                
+                // Set risk level with appropriate class
+                riskLevel.textContent = data.risk_level;
+                riskLevel.className = 'detail-value risk-' + data.risk_level.toLowerCase();
+                
+                // Set other details
+                confidence.textContent = data.confidence;
+                resultAmount.textContent = '$' + formData.get('Transaction Amount');
+                resultPayment.textContent = formData.get('Payment Method');
+                
+                // Set recommendation
+                if (data.is_fraud) {
+                    resultRecommendation.innerHTML = '<p>Recommendation: <strong>Block transaction and flag for review.</strong> Consider contacting the customer for verification.</p>';
+                } else if (data.risk_level === 'Medium') {
+                    resultRecommendation.innerHTML = '<p>Recommendation: <strong>Proceed with caution.</strong> Consider additional verification steps before approval.</p>';
+                } else {
+                    resultRecommendation.innerHTML = '<p>Recommendation: <strong>Approve transaction.</strong> No suspicious patterns detected.</p>';
+                }
+                
+                // Show result content
+                resultContent.classList.remove('hidden');
+                
+                // Create risk gauge chart
+                createGaugeChart(parseFloat(data.probability) * 100);
+                
+                // Create risk factors chart
+                createRiskFactorsChart(formData, data);
+            }
+            
+            function createGaugeChart(probability) {
+                const ctx = document.getElementById('gaugeChart').getContext('2d');
+                
+                // Destroy previous chart if it exists
+                if (gaugeChart) {
+                    gaugeChart.destroy();
+                }
+                
+                // Configure gradient
+                const gradientSegment = ctx.createLinearGradient(0, 0, 200, 0);
+                gradientSegment.addColorStop(0, '#2ecc71');    // Green
+                gradientSegment.addColorStop(0.4, '#f39c12');  // Yellow/Orange
+                gradientSegment.addColorStop(1, '#e74c3c');    // Red
+                
+                gaugeChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [probability, 100 - probability],
+                            backgroundColor: [gradientSegment, '#ecf0f1'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        circumference: 180,
+                        rotation: 270,
+                        cutout: '75%',
+                        maintainAspectRatio: true,
+                        plugins: {
+                            tooltip: {
+                                enabled: false
+                            },
+                            legend: {
+                                display: false
+                            },
+                            datalabels: {
+                                display: false
+                            }
+                        },
+                        animation: {
+                            animateRotate: true,
+                            animateScale: true
+                        }
+                    },
+                    plugins: [{
+                        id: 'gaugeNeedle',
+                        afterDatasetDraw(chart) {
+                            const {ctx, data, chartArea} = chart;
+                            
+                            ctx.save();
+                            const xCenter = chart.getDatasetMeta(0).data[0].x;
+                            const yCenter = chart.getDatasetMeta(0).data[0].y;
+                            const innerRadius = chart.getDatasetMeta(0).data[0].innerRadius;
+                            const outerRadius = chart.getDatasetMeta(0).data[0].outerRadius;
+                            
+                            // Draw gauge value
+                            ctx.font = 'bold 24px Roboto';
+                            ctx.fillStyle = probability > 70 ? '#e74c3c' : (probability > 30 ? '#f39c12' : '#2ecc71');
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(`${probability.toFixed(1)}%`, xCenter, yCenter);
+                            
+                            ctx.font = '14px Roboto';
+                            ctx.fillStyle = '#333';
+                            ctx.fillText('Risk Score', xCenter, yCenter + 25);
+                            
+                            // Draw labels
+                            ctx.font = '12px Roboto';
+                            ctx.fillStyle = '#2ecc71';
+                            ctx.textAlign = 'left';
+                            ctx.fillText('Low Risk', chartArea.left, yCenter + 50);
+                            
+                            ctx.fillStyle = '#e74c3c';
+                            ctx.textAlign = 'right';
+                            ctx.fillText('High Risk', chartArea.right, yCenter + 50);
+                            
+                            ctx.restore();
+                        }
+                    }]
+                });
+            }
+            
+            function createRiskFactorsChart(formData, predictionData) {
+                const ctx = document.getElementById('riskFactorsChart').getContext('2d');
+                
+                // Destroy previous chart if it exists
+                if (riskFactorsChart) {
+                    riskFactorsChart.destroy();
+                }
+                
+                // Get form values for risk factors
+                const amount = parseFloat(formData.get('Transaction Amount'));
+                const prevTrans = parseInt(formData.get('Previous Transactions Count'));
+                const accountAge = parseInt(formData.get('Account Age Days'));
+                const shippingDifferent = formData.get('Shipping Address') === 'Different from billing address';
+                
+                // Calculate risk factors (simplified for visualization)
+                // These values would typically come from your ML model
+                const amountFactor = Math.min(amount / 1000 * 25, 100);
+                const prevTransFactor = Math.max(100 - prevTrans * 5, 0);
+                const accountAgeFactor = Math.max(100 - accountAge / 30 * 25, 0);
+                const shippingFactor = shippingDifferent ? 60 : 10;
+                
+                // Create risk factors data
+                const labels = ['Transaction Amount', 'Transaction History', 'Account Age', 'Shipping Address'];
+                const factorValues = [amountFactor, prevTransFactor, accountAgeFactor, shippingFactor];
+                
+                // Function to determine bar color based on risk
+                const getBarColors = (values) => {
+                    return values.map(value => {
+                        if (value < 25) return 'rgba(46, 204, 113, 0.7)';      // Low risk - green
+                        else if (value < 50) return 'rgba(39, 174, 96, 0.7)';  // Medium-Low - darker green
+                        else if (value < 75) return 'rgba(243, 156, 18, 0.7)'; // Medium-High - orange
+                        else return 'rgba(231, 76, 60, 0.7)';                 // High risk - red
+                    });
+                };
+                
+                riskFactorsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Risk Factor (%)',
+                            data: factorValues,
+                            backgroundColor: getBarColors(factorValues),
+                            borderColor: getBarColors(factorValues).map(color => color.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: 'Risk Factor (%)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const value = context.raw;
+                                        if (value < 25) return 'Low Risk';
+                                        else if (value < 50) return 'Medium-Low Risk';
+                                        else if (value < 75) return 'Medium-High Risk';
+                                        else return 'High Risk';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
